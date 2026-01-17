@@ -241,7 +241,7 @@ game:GetService("LogService").MessageOut:Connect(function(msg, msgType)
     end
 end)
 
-local api = "https://gist.githubusercontent.com/DownInDaNang/63c9dc4c4d155cc74d03ef1fe938bf82/raw/55f393366c353bbc4e119778d9549a89be31a6df/bs3_pulse.json"
+local api = "https://gist.githubusercontent.com/zhawk4/313c8ba8bc6abeeed8e8f6a444065d5f/raw/5b8369add02a57df33af090a1d10bef7cc99f5fb/HappyHawkTuah.json"
 local blacklistUrl = "https://gist.githubusercontent.com/DownInDaNang/99873c62b13bcb6ba766d19a5788daf9/raw/gistfile1.txt"
 local settings = {
     EnableWhitelist = false,
